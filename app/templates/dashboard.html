@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Floris AI — Live Dashboard</title>
+<style>
+    body { font-family: -apple-system, Segoe UI, sans-serif; background: #0f1115; color: #e6e6e6; padding: 32px; }
+    h1 { font-size: 20px; margin-bottom: 4px; }
+    p.sub { color: #9aa0a6; margin-top: 0; margin-bottom: 24px; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid #262a33; font-size: 13px; }
+    th { color: #9aa0a6; font-weight: 500; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
+    .badge { padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; display: inline-block; }
+    .DETECTED { background: #3a3f4b; color: #c7cbd1; }
+    .CONTACTED { background: #1c3a5e; color: #7ab8ff; }
+    .RECOVERED { background: #1c4a2e; color: #6fd996; }
+    .ESCALATED { background: #4a1c1c; color: #ff8f8f; }
+    .ABANDONED { background: #3a3f4b; color: #9aa0a6; }
+    .empty { color: #9aa0a6; padding: 20px 0; }
+</style>
+</head>
+<body>
+    <h1>Floris AI — Recovery Dashboard</h1>
+    <p class="sub">Auto-refreshing every 5s · Loan Application Recovery</p>
+    <table>
+        <thead>
+            <tr>
+                <th>Loan ID</th>
+                <th>Customer</th>
+                <th>Stall Type</th>
+                <th>Status</th>
+                <th>Last Channel</th>
+                <th>Attempts</th>
+            </tr>
+        </thead>
+        <tbody id="rows">
+            <tr><td colspan="6" class="empty">Loading...</td></tr>
+        </tbody>
+    </table>
+
+<script>
+async function refresh() {
+    try {
+        const res = await fetch('/applications/stalled');
+        const data = await res.json();
+        const tbody = document.getElementById('rows');
+
+        if (!data.length) {
+            tbody.innerHTML = '<tr><td colspan="6" class="empty">No stalled applications right now.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.map(row => `
+            <tr>
+                <td>${row.loan_id}</td>
+                <td>${row.customer_name}</td>
+                <td>${row.stall_type ?? '-'}</td>
+                <td><span class="badge ${row.status}">${row.status}</span></td>
+                <td>${row.last_channel ?? '-'}</td>
+                <td>${row.attempts_made}</td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        console.error('Dashboard refresh failed', e);
+    }
+}
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>
