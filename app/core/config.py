@@ -1,10 +1,3 @@
-"""
-Central place where ALL environment/config values live.
-Nothing else in the codebase should call os.getenv() directly —
-everything imports `settings` from here. This is the standard
-production pattern: one source of truth for config.
-"""
-
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,9 +10,6 @@ class Settings(BaseSettings):
     KIPPS_VOICE_AGENT_ID: str = ""
     KIPPS_CHAT_AGENT_ID: str = ""
     KIPPS_BASE_URL: str = "https://backend.kipps.ai"
-
-    # Kipps internal campaign-trigger (reverse-engineered, not public API —
-    # see app/services/kipps_client.py for details)
     KIPPS_BEARER_TOKEN: str = ""
     KIPPS_ORG_ID: str = ""
     KIPPS_CAMPAIGN_ID: str = ""
@@ -30,5 +20,4 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 
-# Import this everywhere you need a config value: `from app.core.config import settings`
 settings = Settings()

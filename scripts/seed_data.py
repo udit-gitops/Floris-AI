@@ -1,13 +1,8 @@
 """
-Seeds 8 fake loan applications covering all 3 stall types, so you have
-data to demo against immediately after init_db.py runs.
+Seed demo loan applications covering all three stall types.
 
-Usage (from project root, venv active):
-    python scripts/seed_data.py
-
-Timestamps are backdated deliberately so each row is ALREADY past its
-stall threshold (see app/core/constants.py) the moment you seed it —
-no waiting around for real time to pass during dev/demo.
+Timestamps are intentionally backdated so the applications already meet
+their respective stall thresholds when the seed script is run.
 """
 
 import sys
@@ -22,7 +17,7 @@ from app.models.application import Application
 NOW = datetime.now(timezone.utc)
 
 SEED_APPLICATIONS = [
-    # --- Type A: KYC Pending (stage=KYC_UPLOAD, inactive 48h+) ---
+    # Type A: KYC pending
     dict(
         loan_id="LOAN-1001",
         customer_name="Ravi Sharma",
@@ -47,7 +42,7 @@ SEED_APPLICATIONS = [
         loan_amount=500000,
         last_customer_activity_at=NOW - timedelta(hours=50),
     ),
-    # --- Type B: Payment Pending (stage=PAYMENT, inactive 72h+) ---
+    # Type B: Payment pending
     dict(
         loan_id="LOAN-2001",
         customer_name="Sneha Kulkarni",
@@ -72,7 +67,7 @@ SEED_APPLICATIONS = [
         loan_amount=275000,
         last_customer_activity_at=NOW - timedelta(hours=75),
     ),
-    # --- Type C: Gone Silent (any stage, inactive 120h+ / 5 days) ---
+    # Type C: Gone silent
     dict(
         loan_id="LOAN-3001",
         customer_name="Karan Mehta",
@@ -89,7 +84,7 @@ SEED_APPLICATIONS = [
         loan_amount=220000,
         last_customer_activity_at=NOW - timedelta(hours=150),
     ),
-    # --- Control row: NOT stalled (recent activity, should NOT show on dashboard) ---
+    # Control row: recent activity, so it should not appear on the dashboard.
     dict(
         loan_id="LOAN-9999",
         customer_name="Test Fresh Applicant",
@@ -106,13 +101,20 @@ def seed():
     try:
         existing = {row.loan_id for row in db.query(Application.loan_id).all()}
         inserted = 0
+
         for record in SEED_APPLICATIONS:
             if record["loan_id"] in existing:
                 continue
+
             db.add(Application(**record))
             inserted += 1
+
         db.commit()
-        print(f"Seeded {inserted} new applications (skipped {len(SEED_APPLICATIONS) - inserted} already present).")
+
+        print(
+            f"Seeded {inserted} new applications "
+            f"(skipped {len(SEED_APPLICATIONS) - inserted} already present)."
+        )
     finally:
         db.close()
 

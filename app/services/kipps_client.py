@@ -3,13 +3,6 @@ from app.core.config import settings
 
 
 def trigger_recovery_campaign() -> dict:
-    """
-    Resumes/starts the pre-configured 'loan_application_recovery'
-    campaign in Kipps, which places outbound voice calls to whatever
-    audience is currently attached to that campaign in the Kipps
-    dashboard. Returns the raw response (or a status dict if the
-    response body is empty).
-    """
     if not (
         settings.KIPPS_BEARER_TOKEN
         and settings.KIPPS_ORG_ID

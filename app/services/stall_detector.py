@@ -1,10 +1,6 @@
 """
-Classifies WHICH stall type an application currently is, based on its
-`stage` and how long it's been inactive. Called by the /applications/stalled
-endpoint (dashboard + polling) and can later be wired to a cron job.
-
-Kept separate from the models so the classification RULES are visible
-in one file, not buried inside a route handler.
+Classify the current stall type for a loan application based on its
+stage and time since the last customer activity.
 """
 
 from datetime import datetime, timezone
@@ -22,12 +18,8 @@ from app.models.application import Application
 
 def classify_stall(app: Application) -> str | None:
     """
-    Returns one of STALL_TYPE_KYC / STALL_TYPE_PAYMENT / STALL_TYPE_SILENT,
-    or None if the application isn't stalled yet.
-
-    Order matters: we check stage-specific rules first (KYC/Payment),
-    then fall back to the generic "gone silent" rule which applies
-    regardless of stage.
+    Return the applicable stall type, or None if the application is
+    not stalled yet.
     """
     now = datetime.now(timezone.utc)
     last_activity = app.last_customer_activity_at

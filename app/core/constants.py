@@ -1,16 +1,15 @@
 """
 Business rule constants for Floris AI.
-Keeping these here (instead of scattered magic numbers in logic files)
-means when a judge asks "why 2 attempts, why 48 hours", you can point
-to ONE file and explain every number.
+Centralizes thresholds, escalation rules, statuses, stall types, and
+communication channels used across the application.
 """
 
-# --- Stall detection thresholds (hours since last activity) ---
+# Stall detection thresholds (hours since last activity)
 KYC_STALL_HOURS = 48
 PAYMENT_STALL_HOURS = 72
 SILENT_STALL_HOURS = 120  # 5 days
 
-# --- Escalation ---
+# Escalation
 MAX_AUTO_ATTEMPTS = 2
 
 RED_FLAG_KEYWORDS = [
@@ -24,22 +23,22 @@ RED_FLAG_KEYWORDS = [
     "talk to someone",
 ]
 
-# --- Do-not-disturb window (24h clock, local time) ---
+# Do-not-disturb window (24-hour clock, local time)
 DND_START_HOUR = 20  # 8 PM
 DND_END_HOUR = 9  # 9 AM
 
-# --- Status values used across applications / conversation_state ---
+# Status values used across applications and conversation_state
 STATUS_DETECTED = "DETECTED"
 STATUS_CONTACTED = "CONTACTED"
 STATUS_RECOVERED = "RECOVERED"
 STATUS_ESCALATED = "ESCALATED"
 STATUS_ABANDONED = "ABANDONED"
 
-# --- Stall types ---
+# Stall types
 STALL_TYPE_KYC = "KYC_PENDING"
 STALL_TYPE_PAYMENT = "PAYMENT_PENDING"
 STALL_TYPE_SILENT = "GONE_SILENT"
 
-# --- Channels ---
+# Communication channels
 CHANNEL_VOICE = "voice"
 CHANNEL_CHAT = "chat"

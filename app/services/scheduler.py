@@ -13,10 +13,8 @@ SCAN_INTERVAL_MINUTES = 5
 
 def scan_for_stalls():
     """
-    One scan cycle: check every non-opted-out application, classify its
-    stall status, and update conversation_state.stall_type if it just
-    became stalled (or changed type). Applications with no state row yet
-    get one created with status DETECTED.
+    Check non-opted-out applications for stalled workflows and update
+    conversation state when a new stall is detected or its type changes.
     """
     db = SessionLocal()
     try:
@@ -33,6 +31,7 @@ def scan_for_stalls():
                 .filter(ConversationState.loan_id == app_row.loan_id)
                 .first()
             )
+
             if not state:
                 state = ConversationState(
                     loan_id=app_row.loan_id,
@@ -47,12 +46,15 @@ def scan_for_stalls():
                 newly_flagged += 1
 
         db.commit()
+
         if newly_flagged:
             logger.info(
-                f"[scheduler] Scan complete — {newly_flagged} application(s) newly flagged as stalled."
+                f"[scheduler] Scan complete — "
+                f"{newly_flagged} application(s) newly flagged as stalled."
             )
         else:
             logger.info("[scheduler] Scan complete — no new stalls detected.")
+
     except Exception as e:
         logger.error(f"[scheduler] Scan failed: {e}")
         db.rollback()
@@ -62,16 +64,20 @@ def scan_for_stalls():
 
 def start_scheduler() -> BackgroundScheduler:
     """
-    Call once from app startup (see app/main.py). Runs scan_for_stalls()
-    on a fixed interval in a background thread — doesn't block FastAPI's
-    request handling.
+    Start the background stall scanner. The scheduler runs independently
+    of FastAPI request handling.
     """
     scheduler = BackgroundScheduler()
     scheduler.add_job(
-        scan_for_stalls, "interval", minutes=SCAN_INTERVAL_MINUTES, id="stall_scan"
+        scan_for_stalls,
+        "interval",
+        minutes=SCAN_INTERVAL_MINUTES,
+        id="stall_scan",
     )
     scheduler.start()
+
     logger.info(
         f"[scheduler] Started — scanning every {SCAN_INTERVAL_MINUTES} minutes."
     )
+
     return scheduler

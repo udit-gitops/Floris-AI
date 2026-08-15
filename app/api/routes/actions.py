@@ -1,8 +1,7 @@
 """
-Write-side endpoints: the 3 remaining function-calls Kipps agents use
-to actually DO things — log a contact attempt, escalate to a human,
-or record a channel switch. Each one updates conversation_state,
-which is what keeps Voice and Chat in sync.
+Write-side endpoints used by the Kipps agents to update recovery state:
+logging contact attempts, escalating to a human, and recording channel
+switches between Voice and Chat.
 """
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -28,30 +27,21 @@ router = APIRouter(tags=["actions"])
 
 
 def _get_or_create_state(db: Session, loan_id: str) -> ConversationState:
-    """
-    NOTE: loan_id passed here must already be the RESOLVED/normalized
-    loan_id (e.g. "LOAN-2001"), not raw voice/STT input — callers below
-    resolve it via _find_application before calling this.
-    """
+    """Get the conversation state for a normalized loan ID, creating it if needed."""
     state = (
         db.query(ConversationState).filter(ConversationState.loan_id == loan_id).first()
     )
     if not state:
         state = ConversationState(loan_id=loan_id, attempts_made=0, status="DETECTED")
         db.add(state)
-        db.flush()  # so state.loan_id etc. are available without a full commit yet
+        db.flush()
     return state
 
 
 def _auto_escalate_if_needed(
     db: Session, loan_id: str, state: ConversationState
 ) -> None:
-    """
-    Shared helper: after every recovery attempt, check BOTH escalation
-    triggers (retry exhaustion here; red-flag keyword is checked by the
-    agent calling /escalate directly when it detects one in conversation).
-    Keeps the auto-check in one place instead of duplicating it.
-    """
+    """Check whether the latest recovery attempt should trigger escalation."""
     escalate_needed, reason = should_escalate(state.attempts_made, latest_transcript="")
     if escalate_needed:
         state.status = STATUS_ESCALATED
@@ -70,12 +60,7 @@ def _auto_escalate_if_needed(
 def send_recovery_message(
     payload: SendRecoveryMessageRequest, db: Session = Depends(get_db)
 ):
-    """
-    Called by the agent right after it contacts the customer (start or
-    end of a call/chat — you decide the exact trigger point when wiring
-    the Kipps function). Increments attempts_made, updates last_channel
-    and last_summary, and checks escalation as a side effect.
-    """
+    """Escalate an application and add the full context to the human queue."""
     app_row = _find_application(db, payload.loan_id)
     if not app_row:
         raise HTTPException(
@@ -134,12 +119,8 @@ def escalate(payload: EscalateRequest, db: Session = Depends(get_db)):
 
 @router.post("/log_channel_switch", response_model=LogChannelSwitchResponse)
 def log_channel_switch(payload: LogChannelSwitchRequest, db: Session = Depends(get_db)):
-    """
-    Called when a customer moves from one channel to another (e.g. Voice
-    call ends, customer later opens Chat). Updates last_channel and
-    last_summary so the NEW channel's first get_application_status call
-    already has continuity — this is the core dual-channel feature.
-    """
+    """Record a channel switch and preserve the conversation summary for continuity."""
+
     app_row = _find_application(db, payload.loan_id)
     if not app_row:
         raise HTTPException(

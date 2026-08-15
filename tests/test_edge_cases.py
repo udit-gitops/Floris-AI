@@ -1,10 +1,4 @@
-"""
-Unit tests for edge-case guardrails (app/services/edge_cases.py).
-Run with: pytest tests/test_edge_cases.py -v
-"""
-
 from datetime import datetime
-
 from app.services.edge_cases import is_within_dnd_hours, is_locked_for_contact
 
 
