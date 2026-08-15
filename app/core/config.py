@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     KIPPS_CHAT_AGENT_ID: str = ""
     KIPPS_BASE_URL: str = "https://backend.kipps.ai"
 
+    # Kipps internal campaign-trigger (reverse-engineered, not public API —
+    # see app/services/kipps_client.py for details)
+    KIPPS_BEARER_TOKEN: str = ""
+    KIPPS_ORG_ID: str = ""
+    KIPPS_CAMPAIGN_ID: str = ""
+
     # App
     APP_ENV: str = "development"
 
