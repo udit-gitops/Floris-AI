@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+
 from app.api.routes import applications, actions, dashboard
 from app.core.config import settings
 from app.services.scheduler import start_scheduler
@@ -14,7 +15,15 @@ app.include_router(applications.router)
 app.include_router(actions.router)
 app.include_router(dashboard.router)
 
-@app.on_event("startup") def on_startup(): start_scheduler()
+
+@app.on_event("startup")
+def on_startup():
+    """
+    Starts the background stall-scanner when the app boots — this is
+    what makes stall detection continuous/autonomous instead of only
+    running when someone happens to hit /applications/stalled.
+    """
+    start_scheduler()
 
 
 @app.get("/")
