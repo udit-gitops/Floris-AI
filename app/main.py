@@ -1,5 +1,9 @@
 from fastapi import FastAPI
 
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
 from app.api.routes import applications, actions, dashboard
 from app.core.config import settings
 from app.services.scheduler import start_scheduler
