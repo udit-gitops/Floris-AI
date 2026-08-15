@@ -10,10 +10,8 @@ class Settings(BaseSettings):
     KIPPS_VOICE_AGENT_ID: str = ""
     KIPPS_CHAT_AGENT_ID: str = ""
     KIPPS_BASE_URL: str = "https://backend.kipps.ai"
-    KIPPS_BEARER_TOKEN: str = ""
-    KIPPS_ORG_ID: str = ""
-    KIPPS_CAMPAIGN_ID: str = ""
-
+    KIPPS_WEBHOOK_URL: str = ""
+    KIPPS_WEBHOOK_SECRET: str = ""
     # App
     APP_ENV: str = "development"
 

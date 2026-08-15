@@ -1,7 +1,15 @@
-from fastapi import APIRouter, Request
-from fastapi.templating import Jinja2Templates
+"""
+Serves the mini dashboard HTML page (Section 7 of the plan). The page
+itself polls /applications/stalled every 5s via JS fetch — this route
+just renders the initial shell, it doesn't push data server-side.
+"""
 
-from app.services.kipps_client import trigger_recovery_campaign
+from fastapi import APIRouter, Request, Depends
+from fastapi.templating import Jinja2Templates
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from app.services.kipps_client import trigger_recovery_call
 
 router = APIRouter(tags=["dashboard"])
 templates = Jinja2Templates(directory="app/templates")
@@ -12,11 +20,11 @@ def dashboard(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
 
 
-@router.post("/trigger_campaign")
-def trigger_campaign():
+@router.post("/trigger_call")
+def trigger_call(loan_id: str, db: Session = Depends(get_db)):
     """
-    Manually dispatches the Kipps recovery campaign — see
-    app/services/kipps_client.py for important context on how this
-    endpoint was discovered and its reliability caveats.
+    Dispatches an outbound recovery call for one specific stalled
+    application via Kipps' documented campaign webhook — see
+    app/services/kipps_client.py.
     """
-    return trigger_recovery_campaign()
+    return trigger_recovery_call(loan_id, db)
