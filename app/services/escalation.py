@@ -1,5 +1,5 @@
 """
-Escalation decision logic kept independent of database and HTTP dependencies.
+Escalation decision logic kept independent of database andd HTTP dependencies.
 """
 
 from app.core.constants import MAX_AUTO_ATTEMPTS, RED_FLAG_KEYWORDS
