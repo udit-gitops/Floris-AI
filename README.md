@@ -6,6 +6,7 @@
 
 ## Live deployment
 
+| | |
 |---|---|
 | **Live API** | https://floris-ai.onrender.com |
 | **Live Dashboard** | https://floris-ai.onrender.com/dashboard |
