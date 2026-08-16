@@ -1,92 +1,129 @@
 # Floris AI
 
-**Autonomous workflow recovery agent for stalled customer journeys**
-Built for Kipps.AI's *Build for New Age India 2026* Hackathon — Track 03 (Support)
+**An autonomous workflow recovery agent for stalled customer journeys, built on Kipps.AI**
+
+*Submitted to Kipps.AI's "Build for New Age India 2026" Hackathon - Track 03: Support*
 
 ---
 
-## The problem
+## Overview
 
-Businesses lose stalled customer journeys — unfinished applications, missing documents, pending payments, customers who go silent — because no one follows up at the right time, on the right channel, with the right context.
+Businesses lose recoverable revenue every day to stalled customer journeys - an unfinished loan application, a missing document, a payment left pending, a customer who simply goes quiet. Nobody follows up at the right time, on the right channel, with the right context, until it's too late.
 
-**Floris AI** autonomously detects stalled workflows, proactively re-engages the customer over Voice or Chat, preserves context across both channels, and escalates to a human only when it genuinely needs one.
+**Floris AI** watches for exactly this. It runs a continuous background scan across customer applications, classifies *why* each one has stalled, and re-engages the customer over voice or chat - carrying full conversation context across both channels — before escalating to a human only when the situation genuinely calls for one.
 
-This repository demonstrates the concept on one vertical: **loan application recovery.**
-
----
-
-## What it does
-
-- Continuously scans loan applications and classifies stalls into three types, each with distinct recovery logic
-- Lets a customer talk to either the **Kipps Voice Agent** or the **Kipps Chat Agent**, with full context carried over if they switch channels
-- Escalates to a human queue the moment a conversation shows real distress or repeated failure — with full context attached, not just a flag
-- Shows live status on a dashboard, and can dispatch the outbound recovery campaign on demand
+This repository demonstrates the system on a single vertical: **loan application recovery.**
 
 ---
 
-## Architecture
+## Why this matters (Track 03 alignment)
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│              BACKGROUND STALL SCANNER (every 5 min)           │
-│   Scans PostgreSQL, classifies each application's stall type  │
-└───────────────────────────┬────────────────────────────────┘
-                             │
-        ┌────────────────────┼────────────────────┐
-        ▼                    ▼                    ▼
- ┌─────────────┐    ┌──────────────┐     ┌────────────────┐
- │ Kipps VOICE  │    │ Kipps CHAT    │     │  Knowledge Base │
- │    Agent     │◄──►│    Agent      │◄───►│   (loan FAQs)   │
- └──────┬───────┘    └──────┬───────┘     └─────────────────┘
-        │   Function Calling (4 endpoints)  │
-        └─────────────┬─────────────────────┘
-                       ▼
-        ┌───────────────────────┐
-        │  conversation_state     │  ← both agents read/write here,
-        │  (shared context table) │     so switching channel never
-        └──────────┬─────────────┘     loses context
-                    ▼
-        ┌───────────────────────┐
-        │   ESCALATION LOGIC      │ → human_queue (full context)
-        │  (2 independent triggers)│
-        └───────────────────────┘
-                    ▼
-        ┌───────────────────────┐
-        │   LIVE DASHBOARD         │  ← status table + manual
-        └───────────────────────┘     campaign dispatch
+Kipps.AI's Support track calls for: *"Chat resolution → voice escalation with context. Handle the majority of queries autonomously; escalate only what genuinely needs a human."*
+
+Floris AI implements this directly — a customer can resolve a query through Chat, and if it needs a human, the handoff carries the full conversation history, not just a flag.
+
+---
+
+## System architecture
+
+```mermaid
+flowchart TB
+    subgraph Detection["Autonomous Detection"]
+        SCHED["Background Scheduler<br/>(scans every 5 min)"]
+        DB[(PostgreSQL)]
+        SCHED -->|classifies stall type| DB
+    end
+
+    subgraph Kipps["Kipps.AI Platform"]
+        VOICE["Voice Agent"]
+        CHAT["Chat Agent"]
+        KB["Knowledge Base"]
+        WORKFLOW["Outbound Workflow<br/>(Webhook → Phone Call)"]
+    end
+
+    subgraph Backend["Floris AI Backend (FastAPI)"]
+        API["Function Calling Endpoints"]
+        STATE[("conversation_state<br/>shared context")]
+        ESC["Escalation Engine"]
+        QUEUE[("human_queue")]
+        DASH["Live Dashboard"]
+    end
+
+    DB --> API
+    VOICE <-->|4 documented functions| API
+    CHAT <-->|4 documented functions| API
+    CHAT <--> KB
+    API --> STATE
+    STATE -->|context carried across channels| VOICE
+    STATE -->|context carried across channels| CHAT
+    API --> ESC
+    ESC -->|full context on handoff| QUEUE
+    DASH --> API
+    DASH -->|dispatch call for a stalled lead| WORKFLOW
+    WORKFLOW --> VOICE
 ```
 
 **Backend:** FastAPI + PostgreSQL, deployed on Render
-**Platform:** Kipps Voice Agent, Chat Agent, Knowledge Base, Function Calling
-**Glue:** Kipps agents call our backend via 4 documented Function Calling endpoints; a background scheduler keeps stall detection running independent of any request.
+**Platform:** Kipps Voice Agent, Chat Agent, Knowledge Base, Function Calling, Workflow Builder
+**Glue:** Kipps agents call our backend through 4 documented Function Calling endpoints; a background scheduler keeps detection running independently of any request or dashboard visit.
 
 ---
 
 ## The three stall types
 
-| Type | Trigger | Recovery behavior |
+| Type | Trigger condition | Recovery behavior |
 |---|---|---|
-| **KYC Pending** | No document upload 48h after start | Explains missing docs (Aadhaar/PAN), guides upload |
-| **Payment Pending** | Approved but unpaid 72h later | Confirms intent, escalates immediately on any sign of inability to pay (compliance-sensitive — does not wait for retry exhaustion) |
-| **Gone Silent** | No activity 120h+ (5 days) | Generic re-engagement, channel-agnostic |
+| **KYC Pending** | No document upload 48h after starting | Explains missing documents (Aadhaar/PAN), guides the upload |
+| **Payment Pending** | Approved but unpaid 72h later | Confirms intent; escalates **immediately** on any sign of inability to pay — this is compliance-sensitive and does not wait for retry exhaustion |
+| **Gone Silent** | No activity for 120h+ (5 days) | Generic, channel-agnostic re-engagement |
 
-Each type has genuinely different agent behavior — not three copies of the same script.
+Each type drives genuinely different agent behavior — this is not one script reused three times.
+
+```mermaid
+flowchart LR
+    A[Application] --> B{Inactive how long?<br/>At what stage?}
+    B -->|48h, KYC stage| C[KYC Pending]
+    B -->|72h, Payment stage| D[Payment Pending]
+    B -->|120h, any stage| E[Gone Silent]
+    C --> F[Voice/Chat explains<br/>missing documents]
+    D --> G[Voice/Chat confirms intent<br/>→ escalates on distress signal]
+    E --> H[Generic re-engagement,<br/>either channel]
+```
 
 ---
 
-## Dual-channel context (the core differentiator)
+## Dual-channel context — the core differentiator
 
-Every conversation — Voice or Chat — starts with the agent calling `get_application_status`, which returns not just the loan's stage but `last_channel` and `last_summary` from a shared `conversation_state` table.
+Every conversation, on either channel, begins with the agent calling `get_application_status`. This doesn't just return the loan's stage — it returns `last_channel` and `last_summary` from a shared `conversation_state` table that both agents read and write.
 
-**Concretely:** a customer explains their situation to the Voice agent. Two days later they open Chat instead. The Chat agent's first move is to check this table — it already knows what was discussed, and continues the conversation instead of starting cold.
+**In practice:** a customer explains their situation to the Voice agent. Two days later they open Chat instead. The Chat agent's very first action is to check this table — it already knows what was discussed and continues the conversation instead of starting cold.
 
-This was tested end-to-end and confirmed working: a customer's promise made over Voice ("I'll upload my Aadhaar and PAN") was correctly recalled by the Chat agent in a separate session.
+```mermaid
+sequenceDiagram
+    participant C as Customer
+    participant V as Voice Agent
+    participant B as Backend
+    participant Ch as Chat Agent
+
+    C->>V: "I'll upload my Aadhaar and PAN"
+    V->>B: send_recovery_message(loan_id, "voice", summary)
+    B->>B: conversation_state.last_summary = "..."
+
+    Note over C,Ch: Two days later, different channel
+
+    C->>Ch: "Checking on my loan"
+    Ch->>B: get_application_status(loan_id)
+    B-->>Ch: last_channel="voice", last_summary="promised to upload docs"
+    Ch->>C: "Based on our records, you mentioned you'd upload your Aadhaar and PAN"
+```
+
+This was verified end-to-end during testing — a promise made over Voice was correctly recalled by the Chat agent in a completely separate session.
 
 ---
 
 ## Escalation design
 
-Two independent triggers — either alone is sufficient:
+Two independent triggers — either one alone is sufficient to escalate:
 
 ```python
 def should_escalate(attempts_made, latest_transcript):
@@ -100,45 +137,45 @@ def should_escalate(attempts_made, latest_transcript):
     return False, None
 ```
 
-Every escalation writes a **full context record** to `human_queue` — what stall type, what was tried, why it escalated — not just a boolean flag. A human picking this up knows immediately what happened.
+Every escalation writes a **full context record** to `human_queue` — the stall type, what was already tried, and exactly why it escalated. Whoever picks it up doesn't start from zero.
 
 ---
 
-## Function Calling endpoints (what the Kipps agents call)
+## Function Calling endpoints
+
+The four functions Kipps' Voice and Chat agents call into:
 
 | Endpoint | Method | Purpose |
 |---|---|---|
-| `/applications/status` | GET | Fetch current stage, stall type, and shared context before responding |
-| `/send_recovery_message` | POST | Log a contact attempt; auto-checks retry-exhaustion escalation |
-| `/escalate` | POST | Hand off to human queue with full context |
-| `/log_channel_switch` | POST | Record a Voice↔Chat transition, preserving continuity |
+| `/applications/status` | `GET` | Fetch stage, stall type, and shared context before responding |
+| `/send_recovery_message` | `POST` | Log a contact attempt; auto-checks retry-exhaustion escalation |
+| `/escalate` | `POST` | Hand off to the human queue with full context |
+| `/log_channel_switch` | `POST` | Record a Voice ↔ Chat transition, preserving continuity |
 
-Voice input is normalized before lookup (`"1001"`, `"loan_1001"`, `"LOAN-1001"` all resolve to the same record) since STT transcription of loan IDs is inconsistent.
+Loan ID lookups are normalized before querying, since voice transcription of IDs is inconsistent — `"1001"`, `"loan_1001"`, and `"LOAN-1001"` all resolve to the same record.
 
 ---
 
 ## Autonomous detection
 
-A background scheduler (`APScheduler`) runs a full stall-classification scan every 5 minutes, independent of any dashboard poll or agent request — the system knows about a new stall before anyone asks it to check.
+A background scheduler (`APScheduler`) runs a full stall-classification scan every 5 minutes, independent of any dashboard visit or agent request. The system knows about a new stall before anyone thinks to check.
 
 ---
 
-## Outbound campaign dispatch (with full transparency)
+## Outbound call dispatch
 
-The dashboard includes a **"Dispatch Recovery Campaign"** button that triggers Kipps' outbound voice campaign for stalled applicants.
+The live dashboard includes a **Call** action against each stalled application. This is wired through Kipps' own **Workflow Builder** — an `API/Webhook` trigger node connected to a `Phone Call` action node, configured against the Loan Recovery Voice Agent and a dedicated outbound number.
 
-**Honest disclosure:** Kipps' public API (`/api/docs/`) does not expose an endpoint for triggering a campaign programmatically. This integration calls `POST /campaign/campaigns/{id}/resume/` — an endpoint identified by inspecting the network request made when manually starting a campaign in the Kipps dashboard (`app.kipps.ai`), using browser DevTools. Authentication uses the same long-lived bearer token our own account already holds; no credentials or access were obtained through any bypass.
-
-Because this endpoint is undocumented, it may change without notice — it is a best-effort addition, not something the core system depends on. Every other integration in this project (all 4 Function Calling endpoints, Knowledge Base, dual-channel context) uses Kipps' fully documented, supported integration surface.
+When the backend posts a lead's contact details to the workflow's webhook, Kipps dispatches the outbound call automatically — no manual dialing, no manual audience management. This was tested and confirmed working end-to-end: a real call was placed, answered, and the agent correctly reported the application's status using live backend data.
 
 ---
 
 ## Edge cases handled
 
-- **Do-not-disturb hours** — no outbound contact 8 PM–9 AM (`app/services/edge_cases.py`)
-- **Opt-out respect** — `do_not_contact` flag permanently excludes an application from scanning and contact
-- **Duplicate-contact lock** — `status == CONTACTED` prevents a second attempt while one is in flight
-- **Retry cap** — max 2 automated attempts before mandatory escalation
+- **Do-not-disturb hours** — no outbound contact between 8 PM and 9 AM (`app/services/edge_cases.py`)
+- **Opt-out respect** — a `do_not_contact` flag permanently excludes an application from scanning and contact
+- **Duplicate-contact lock** — an application already `CONTACTED` cannot receive a second simultaneous attempt
+- **Retry cap** — a maximum of 2 automated attempts before escalation is mandatory
 
 ---
 
@@ -147,48 +184,50 @@ Because this endpoint is undocumented, it may change without notice — it is a 
 ```
 floris-ai/
 ├── app/
-│   ├── main.py                     # Entrypoint — wires routers, starts scheduler
+│   ├── main.py                     # Entrypoint — wires routers, starts the scheduler
 │   ├── core/
-│   │   ├── config.py                # Env/config, single source of truth
-│   │   └── constants.py             # Thresholds, DND hours, red-flag keywords
-│   ├── db/                          # SQLAlchemy engine, session, declarative base
-│   ├── models/                      # applications, conversation_state, human_queue
-│   ├── schemas/                     # Pydantic request/response contracts
+│   │   ├── config.py                 # Environment/config, single source of truth
+│   │   └── constants.py              # Thresholds, DND hours, red-flag keywords
+│   ├── db/                           # SQLAlchemy engine, session, declarative base
+│   ├── models/                       # applications, conversation_state, human_queue
+│   ├── schemas/                      # Pydantic request/response contracts
 │   ├── services/
-│   │   ├── stall_detector.py        # classify_stall() — the classification rules
-│   │   ├── escalation.py            # should_escalate() — two-trigger logic
-│   │   ├── edge_cases.py            # DND / duplicate-lock checks
-│   │   ├── scheduler.py             # Autonomous 5-min background scan
-│   │   └── kipps_client.py          # Campaign-dispatch integration
-│   ├── api/routes/                  # applications, actions, dashboard
-│   └── templates/dashboard.html     # Live status table + campaign dispatch button
+│   │   ├── stall_detector.py         # classify_stall() — the classification rules
+│   │   ├── escalation.py             # should_escalate() — the two-trigger logic
+│   │   ├── edge_cases.py             # DND / duplicate-lock checks
+│   │   ├── scheduler.py              # Autonomous 5-minute background scan
+│   │   └── kipps_client.py           # Outbound workflow dispatch
+│   ├── api/routes/                   # applications, actions, dashboard
+│   └── templates/dashboard.html      # Live status table + per-lead call trigger
 ├── scripts/
-│   ├── init_db.py                   # Creates all tables
-│   └── seed_data.py                 # 9 seeded applications across all 3 stall types
-├── tests/                           # 12 unit tests — escalation + edge cases
+│   ├── init_db.py                    # Creates all tables
+│   └── seed_data.py                  # Seeded applications across all 3 stall types
+├── tests/                            # Unit tests — escalation logic + edge cases
 └── requirements.txt
 ```
 
 ---
 
-## Judging criteria mapping
+## How this maps to the judging criteria
 
-- **Problem clarity** — stalled workflows cost businesses recoverable revenue; no one follows up at the right time on the right channel.
-- **Workflow depth & logic** — 3 distinct stall types, each with different trigger conditions and recovery behavior (`stall_detector.py`).
-- **Dual-channel usage** — shared `conversation_state` table; confirmed working end-to-end across Voice and Chat.
-- **Technical feasibility** — deployed, working FastAPI + PostgreSQL backend on Render; edge cases implemented and unit-tested; autonomous background scanning.
-- **Escalation design** — two independent triggers, full-context handoff to `human_queue`, immediate escalation on compliance-sensitive signals (e.g. inability to pay).
+| Criterion | Where it shows up |
+|---|---|
+| **Problem clarity** | Stalled workflows lose recoverable revenue because follow-up doesn't happen at the right time, on the right channel |
+| **Workflow depth & logic** | Three distinct stall types, each with different trigger conditions and recovery behavior — see `stall_detector.py` |
+| **Dual-channel usage** | Shared `conversation_state` table; verified end-to-end across Voice and Chat |
+| **Technical feasibility** | Deployed, working backend on Render; autonomous scanning; unit-tested core logic; edge cases implemented |
+| **Escalation design** | Two independent triggers, full-context handoff, immediate escalation on compliance-sensitive signals |
 
 ---
 
-## Setup
+## Running it locally
 
 ```bash
 python -m venv venv
-venv\Scripts\activate            # Windows
+venv\Scripts\activate              # Windows
 pip install -r requirements.txt
 
-copy .env.example .env           # fill in your DB password + Kipps credentials
+copy .env.example .env             # fill in your DB and Kipps credentials
 
 python scripts/init_db.py
 python scripts/seed_data.py
@@ -196,12 +235,24 @@ python scripts/seed_data.py
 uvicorn app.main:app --reload
 ```
 
-Visit `/docs` for the API, `/dashboard` for live status.
+`/docs` for the API reference, `/dashboard` for live status and call dispatch.
 
 ---
 
 ## Known limitations
 
-- **Telnyx trial account** does not support India-destination outbound calling — demo calls route to a US test number. The Voice pipeline itself (STT → LLM → TTS → Function Calling) works fully; this is a telephony-provider trial restriction, not a design gap.
-- **Hindi/multilingual** support is unreliable — Kipps' STT occasionally drifts to unrelated languages under ambient noise even with English explicitly configured. English performs reliably in controlled conditions; this is documented platform behavior, not something fixable from our side.
-- **Campaign audience configuration** (which contacts an outbound campaign targets) is currently a manual step in the Kipps dashboard — the trigger itself is programmatic, audience assignment is not.
+- **Telnyx's trial telephony account** does not support India-destination outbound calling on the original test number; outbound calls now use a dedicated number purchased through Kipps, which resolved this.
+- **Hindi/multilingual support** is unreliable — Kipps' speech-to-text occasionally drifts to unrelated languages under ambient noise, even with English explicitly configured. English performs reliably under controlled conditions; this is platform behavior outside this project's control.
+
+---
+
+## Acknowledgments
+
+Built on the **Kipps.AI** platform — Voice Agent, Chat Agent, Knowledge Base, Function Calling, and Workflow Builder made this possible without building telephony or speech infrastructure from scratch. Thank you to the Kipps.AI team for hosting this hackathon and for a platform flexible enough to support a genuinely autonomous, dual-channel recovery workflow.
+
+---
+
+## Author
+
+**[Your Name]**
+Solo build — Kipps.AI "Build for New Age India 2026" Hackathon, Track 03 (Support)
