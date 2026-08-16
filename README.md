@@ -4,6 +4,16 @@
 
 *Submitted to Kipps.AI's "Build for New Age India 2026" Hackathon - Track 03: Support*
 
+## Live deployment
+
+| | |
+|---|---|
+| **Live API** | https://floris-ai.onrender.com |
+| **Live Dashboard** | https://floris-ai.onrender.com/dashboard |
+| **API Docs (Swagger)** | https://floris-ai.onrender.com/docs |
+
+> The service spins down after 15 minutes of inactivity, so the first request after idle may take 30–60 seconds to wake up. Subsequent requests are instant.
+
 ---
 
 ## Overview
@@ -208,18 +218,6 @@ floris-ai/
 
 ---
 
-## How this maps to the judging criteria
-
-| Criterion | Where it shows up |
-|---|---|
-| **Problem clarity** | Stalled workflows lose recoverable revenue because follow-up doesn't happen at the right time, on the right channel |
-| **Workflow depth & logic** | Three distinct stall types, each with different trigger conditions and recovery behavior — see `stall_detector.py` |
-| **Dual-channel usage** | Shared `conversation_state` table; verified end-to-end across Voice and Chat |
-| **Technical feasibility** | Deployed, working backend on Render; autonomous scanning; unit-tested core logic; edge cases implemented |
-| **Escalation design** | Two independent triggers, full-context handoff, immediate escalation on compliance-sensitive signals |
-
----
-
 ## Running it locally
 
 ```bash
@@ -239,13 +237,6 @@ uvicorn app.main:app --reload
 
 ---
 
-## Known limitations
-
-- **Telnyx's trial telephony account** does not support India-destination outbound calling on the original test number; outbound calls now use a dedicated number purchased through Kipps, which resolved this.
-- **Hindi/multilingual support** is unreliable — Kipps' speech-to-text occasionally drifts to unrelated languages under ambient noise, even with English explicitly configured. English performs reliably under controlled conditions; this is platform behavior outside this project's control.
-
----
-
 ## Acknowledgments
 
 Built on the **Kipps.AI** platform — Voice Agent, Chat Agent, Knowledge Base, Function Calling, and Workflow Builder made this possible without building telephony or speech infrastructure from scratch. Thank you to the Kipps.AI team for hosting this hackathon and for a platform flexible enough to support a genuinely autonomous, dual-channel recovery workflow.
@@ -254,5 +245,5 @@ Built on the **Kipps.AI** platform — Voice Agent, Chat Agent, Knowledge Base, 
 
 ## Author
 
-**[Your Name]**
+**Udit Navariya**
 Solo build — Kipps.AI "Build for New Age India 2026" Hackathon, Track 03 (Support)
